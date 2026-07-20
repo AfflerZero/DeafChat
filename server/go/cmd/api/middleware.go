@@ -91,21 +91,12 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Add("Vary", "Authorization")
 
-		authorizationHeader := r.Header.Get("Authorization")
-
-		if authorizationHeader == "" {
+		token := app.extractToken(r)
+		if token == "" {
 			r = app.contextSetUser(r, data.AnonymousUser)
 			next.ServeHTTP(w, r)
 			return
 		}
-
-		headerParts := strings.Split(authorizationHeader, " ")
-		if len(headerParts) != 2 || headerParts[0] != "Bearer" {
-			app.invalidAuthenticationTokenResponse(w, r)
-			return
-		}
-
-		token := headerParts[1]
 
 		v := validator.New()
 
@@ -129,6 +120,23 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (app *application) extractToken(r *http.Request) string {
+	authorizationHeader := r.Header.Get("Authorization")
+	if authorizationHeader != "" {
+		headerParts := strings.Split(authorizationHeader, " ")
+		if len(headerParts) == 2 && headerParts[0] == "Bearer" {
+			return headerParts[1]
+		}
+	}
+
+	cookie, err := r.Cookie("session_token")
+	if err == nil {
+		return cookie.Value
+	}
+
+	return ""
 }
 
 func (app *application) requireAuthenticatedUser(next http.HandlerFunc) http.HandlerFunc {
@@ -246,5 +254,18 @@ func (app *application) metrics(next http.Handler) http.Handler {
 
 		duration := time.Since(start).Microseconds()
 		totalProcessingTimeMicroseconds.Add(duration)
+	})
+}
+
+func (app *application) securityHeaders(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("X-Content-Type-Options", "nosniff")
+		w.Header().Set("X-Frame-Options", "DENY")
+
+		if app.config.env == "production" {
+			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")
+		}
+
+		next.ServeHTTP(w, r)
 	})
 }

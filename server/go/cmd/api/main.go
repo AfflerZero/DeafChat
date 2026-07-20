@@ -15,6 +15,7 @@ import (
 
 	"github.com/AfflerZero/DeafChat/internal/data"
 	"github.com/AfflerZero/DeafChat/internal/mailer"
+	"github.com/AfflerZero/DeafChat/internal/signal"
 	"github.com/AfflerZero/DeafChat/internal/vcs"
 
 	_ "github.com/lib/pq"
@@ -135,7 +136,12 @@ func main() {
 		mailer: mailer,
 	}
 
-	err = app.serve()
+	hub := signal.NewHub(logger)
+	go hub.Run()
+
+	SetTrustedOrigins(cfg.cors.trustedOrigins)
+
+	err = app.serve(hub)
 	if err != nil {
 		logger.Error(err.Error())
 		os.Exit(1)

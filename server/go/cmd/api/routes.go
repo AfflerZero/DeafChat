@@ -4,10 +4,11 @@ import (
 	"expvar"
 	"net/http"
 
+	"github.com/AfflerZero/DeafChat/internal/signal"
 	"github.com/julienschmidt/httprouter"
 )
 
-func (app *application) routes() http.Handler {
+func (app *application) routes(hub *signal.Hub) http.Handler {
 	router := httprouter.New()
 
 	router.NotFound = http.HandlerFunc(app.notFoundResponse)
@@ -27,5 +28,13 @@ func (app *application) routes() http.Handler {
 		router.Handler(http.MethodGet, "/debug/vars", expvar.Handler())
 	}
 
-	return app.metrics(app.recoverPanic(app.enableCORS(app.rateLimit(app.authenticate(router)))))
+	restHandler := app.securityHeaders(app.metrics(app.recoverPanic(app.enableCORS(app.rateLimit(app.authenticate(router))))))
+
+	signalHandler := app.securityHeaders(app.metrics(app.recoverPanic(app.enableCORS(app.rateLimit(app.signalHandler(hub))))))
+
+	mux := http.NewServeMux()
+	mux.Handle("/v1/signal", signalHandler)
+	mux.Handle("/", restHandler)
+
+	return mux
 }

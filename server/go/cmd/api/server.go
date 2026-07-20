@@ -9,15 +9,17 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	signalsvc "github.com/AfflerZero/DeafChat/internal/signal"
 )
 
-func (app *application) serve() error {
+func (app *application) serve(hub *signalsvc.Hub) error {
 	srv := &http.Server{
 		Addr:         fmt.Sprintf("%s:%d", app.config.bind, app.config.port),
-		Handler:      app.routes(),
+		Handler:      app.routes(hub),
 		IdleTimeout:  time.Minute,
 		ReadTimeout:  5 * time.Second,
-		WriteTimeout: 10 * time.Second,
+		WriteTimeout: 30 * time.Second,
 	}
 
 	shutdownError := make(chan error)

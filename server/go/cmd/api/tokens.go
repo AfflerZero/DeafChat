@@ -59,6 +59,16 @@ func (app *application) createAuthenticationTokenHandler(w http.ResponseWriter, 
 		return
 	}
 
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_token",
+		Value:    token.Plaintext,
+		Path:     "/",
+		MaxAge:   86400,
+		HttpOnly: true,
+		Secure:   app.config.env == "production",
+		SameSite: http.SameSiteLaxMode,
+	})
+
 	err = app.writeJSON(w, http.StatusCreated, envelope{"authentication_token": token}, nil)
 	if err != nil {
 		app.serverErrorResponse(w, r, err)
