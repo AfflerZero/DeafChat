@@ -32,7 +32,7 @@ var upgrader = websocket.Upgrader{
 }
 
 var trustedOrigins []string
-var roomNameRX = regexp.MustCompile(`^[A-Za-z0-9_-]+$`)
+var roomNameRX = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?$`)
 
 func SetTrustedOrigins(origins []string) {
 	trustedOrigins = origins

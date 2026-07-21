@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"runtime"
 	"strings"
@@ -43,6 +44,7 @@ type config struct {
 	proxy struct {
 		trustHeaders bool
 		trustedCIDRs []string
+		trustedNets  []*net.IPNet
 	}
 	ws struct {
 		maxRoomLength     int
@@ -91,6 +93,14 @@ func main() {
 	flag.BoolVar(&cfg.proxy.trustHeaders, "proxy-trust-headers", false, "Trust X-Forwarded-For/X-Real-IP headers from trusted proxies")
 	flag.Func("proxy-trusted-cidrs", "Trusted proxy CIDRs (space separated)", func(val string) error {
 		cfg.proxy.trustedCIDRs = strings.Fields(val)
+		cfg.proxy.trustedNets = cfg.proxy.trustedNets[:0]
+		for _, cidr := range cfg.proxy.trustedCIDRs {
+			_, network, err := net.ParseCIDR(cidr)
+			if err != nil {
+				return fmt.Errorf("invalid proxy-trusted-cidrs value %q: %w", cidr, err)
+			}
+			cfg.proxy.trustedNets = append(cfg.proxy.trustedNets, network)
+		}
 		return nil
 	})
 
