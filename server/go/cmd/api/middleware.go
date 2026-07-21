@@ -71,74 +71,6 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 			clients[ip] = &client{
 				limiter: rate.NewLimiter(rate.Limit(app.config.limiter.rps), app.config.limiter.burst),
 			}
-
-			func (app *application) clientIP(r *http.Request) string {
-				remoteIP := parseIPFromRemoteAddr(r.RemoteAddr)
-				if remoteIP == "" {
-					return ""
-				}
-
-				if app.config.proxy.trustHeaders && app.isTrustedProxy(remoteIP) {
-					forwardedIP := forwardedClientIP(r)
-					if forwardedIP != "" {
-						return forwardedIP
-					}
-				}
-
-				return remoteIP
-			}
-
-			func forwardedClientIP(r *http.Request) string {
-				xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For"))
-				if xff != "" {
-					parts := strings.Split(xff, ",")
-					first := strings.TrimSpace(parts[0])
-					if net.ParseIP(first) != nil {
-						return first
-					}
-				}
-
-				xrip := strings.TrimSpace(r.Header.Get("X-Real-IP"))
-				if net.ParseIP(xrip) != nil {
-					return xrip
-				}
-
-				return ""
-			}
-
-			func parseIPFromRemoteAddr(remoteAddr string) string {
-				host, _, err := net.SplitHostPort(remoteAddr)
-				if err != nil {
-					if net.ParseIP(remoteAddr) != nil {
-						return remoteAddr
-					}
-					return ""
-				}
-
-				if net.ParseIP(host) == nil {
-					return ""
-				}
-				return host
-			}
-
-			func (app *application) isTrustedProxy(ip string) bool {
-				parsedIP := net.ParseIP(ip)
-				if parsedIP == nil {
-					return false
-				}
-
-				for _, cidr := range app.config.proxy.trustedCIDRs {
-					_, network, err := net.ParseCIDR(cidr)
-					if err != nil {
-						continue
-					}
-					if network.Contains(parsedIP) {
-						return true
-					}
-				}
-
-				return false
-			}
 		}
 
 		clients[ip].lastSeen = time.Now()
@@ -153,6 +85,74 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (app *application) clientIP(r *http.Request) string {
+	remoteIP := parseIPFromRemoteAddr(r.RemoteAddr)
+	if remoteIP == "" {
+		return ""
+	}
+
+	if app.config.proxy.trustHeaders && app.isTrustedProxy(remoteIP) {
+		forwardedIP := forwardedClientIP(r)
+		if forwardedIP != "" {
+			return forwardedIP
+		}
+	}
+
+	return remoteIP
+}
+
+func forwardedClientIP(r *http.Request) string {
+	xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For"))
+	if xff != "" {
+		parts := strings.Split(xff, ",")
+		first := strings.TrimSpace(parts[0])
+		if net.ParseIP(first) != nil {
+			return first
+		}
+	}
+
+	xrip := strings.TrimSpace(r.Header.Get("X-Real-IP"))
+	if net.ParseIP(xrip) != nil {
+		return xrip
+	}
+
+	return ""
+}
+
+func parseIPFromRemoteAddr(remoteAddr string) string {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		if net.ParseIP(remoteAddr) != nil {
+			return remoteAddr
+		}
+		return ""
+	}
+
+	if net.ParseIP(host) == nil {
+		return ""
+	}
+	return host
+}
+
+func (app *application) isTrustedProxy(ip string) bool {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return false
+	}
+
+	for _, cidr := range app.config.proxy.trustedCIDRs {
+		_, network, err := net.ParseCIDR(cidr)
+		if err != nil {
+			continue
+		}
+		if network.Contains(parsedIP) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (app *application) authenticate(next http.Handler) http.Handler {

@@ -79,40 +79,40 @@ func (h *Hub) handleRegister(client *Client) {
 					Room: client.room,
 				})
 			}
-
-			func (h *Hub) CanAccept(room string) bool {
-				h.mu.RLock()
-				defer h.mu.RUnlock()
-				return h.canAcceptLocked(room)
-			}
-
-			func (h *Hub) canAcceptLocked(room string) bool {
-				if h.maxRooms > 0 && h.rooms[room] == nil && len(h.rooms) >= h.maxRooms {
-					return false
-				}
-
-				if h.maxPerRoom > 0 && len(h.rooms[room]) >= h.maxPerRoom {
-					return false
-				}
-
-				if h.maxClients > 0 && h.totalClientsLocked() >= h.maxClients {
-					return false
-				}
-
-				return true
-			}
-
-			func (h *Hub) totalClientsLocked() int {
-				total := 0
-				for _, clients := range h.rooms {
-					total += len(clients)
-				}
-				return total
-			}
 		}
 	}
 
 	h.broadcastPeerCount(client.room)
+}
+
+func (h *Hub) CanAccept(room string) bool {
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+	return h.canAcceptLocked(room)
+}
+
+func (h *Hub) canAcceptLocked(room string) bool {
+	if h.maxRooms > 0 && h.rooms[room] == nil && len(h.rooms) >= h.maxRooms {
+		return false
+	}
+
+	if h.maxPerRoom > 0 && len(h.rooms[room]) >= h.maxPerRoom {
+		return false
+	}
+
+	if h.maxClients > 0 && h.totalClientsLocked() >= h.maxClients {
+		return false
+	}
+
+	return true
+}
+
+func (h *Hub) totalClientsLocked() int {
+	total := 0
+	for _, clients := range h.rooms {
+		total += len(clients)
+	}
+	return total
 }
 
 func (h *Hub) handleUnregister(client *Client) {
