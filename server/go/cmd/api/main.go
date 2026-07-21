@@ -94,7 +94,7 @@ func main() {
 	flag.BoolVar(&cfg.proxy.trustHeaders, "proxy-trust-headers", false, "Trust X-Forwarded-For/X-Real-IP headers from trusted proxies")
 	flag.Func("proxy-trusted-cidrs", "Trusted proxy CIDRs (space separated)", func(val string) error {
 		cfg.proxy.trustedCIDRs = strings.Fields(val)
-		cfg.proxy.trustedNets = cfg.proxy.trustedNets[:0]
+		cfg.proxy.trustedNets = make([]*net.IPNet, 0, len(cfg.proxy.trustedCIDRs))
 		for _, cidr := range cfg.proxy.trustedCIDRs {
 			_, network, err := net.ParseCIDR(cidr)
 			if err != nil {

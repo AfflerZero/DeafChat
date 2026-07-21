@@ -32,7 +32,7 @@ var upgrader = websocket.Upgrader{
 }
 
 var trustedOrigins []string
-var roomNameRX = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?$`)
+var roomNameRegexp = regexp.MustCompile(`^[A-Za-z0-9](?:[A-Za-z0-9_-]*[A-Za-z0-9])?$`)
 
 func SetTrustedOrigins(origins []string) {
 	trustedOrigins = origins
@@ -46,19 +46,20 @@ func (app *application) signalHandler(hub *signal.Hub) http.HandlerFunc {
 			return
 		}
 		if app.config.ws.minRoomLength > 0 && len(room) < app.config.ws.minRoomLength {
-			app.badRequestResponse(w, r, errors.New("room is too short"))
+			app.badRequestResponse(w, r, fmt.Errorf("room must be at least %d characters long", app.config.ws.minRoomLength))
 			return
 		}
 		if app.config.ws.maxRoomLength > 0 && len(room) > app.config.ws.maxRoomLength {
-			app.badRequestResponse(w, r, errors.New("room exceeds maximum length"))
+			app.badRequestResponse(w, r, fmt.Errorf("room must be no more than %d characters long", app.config.ws.maxRoomLength))
 			return
 		}
-		if !roomNameRX.MatchString(room) {
+		if !roomNameRegexp.MatchString(room) {
 			app.badRequestResponse(w, r, errors.New("room contains invalid characters"))
 			return
 		}
-		if !hub.CanAccept(room) {
-			app.errorResponse(w, r, http.StatusTooManyRequests, "room capacity reached")
+		ok, reason := hub.CanAccept(room)
+		if !ok {
+			app.errorResponse(w, r, http.StatusTooManyRequests, reason)
 			return
 		}
 

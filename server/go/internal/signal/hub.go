@@ -50,10 +50,11 @@ func (h *Hub) handleRegister(client *Client) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
-	if !h.canAcceptLocked(client.room) {
-		h.logger.Warn("rejecting websocket client due to hub limits", "room", client.room, "client", client.id)
+	ok, reason := h.canAcceptLocked(client.room)
+	if !ok {
+		h.logger.Warn("rejecting websocket client due to hub limits", "room", client.room, "client", client.id, "reason", reason)
 		close(client.send)
-		_ = client.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, "room capacity reached"))
+		_ = client.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.ClosePolicyViolation, reason))
 		client.conn.Close()
 		return
 	}
@@ -85,26 +86,26 @@ func (h *Hub) handleRegister(client *Client) {
 	h.broadcastPeerCount(client.room)
 }
 
-func (h *Hub) CanAccept(room string) bool {
+func (h *Hub) CanAccept(room string) (bool, string) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	return h.canAcceptLocked(room)
 }
 
-func (h *Hub) canAcceptLocked(room string) bool {
+func (h *Hub) canAcceptLocked(room string) (bool, string) {
 	if h.maxRooms > 0 && h.rooms[room] == nil && len(h.rooms) >= h.maxRooms {
-		return false
+		return false, "max rooms reached"
 	}
 
 	if h.maxPerRoom > 0 && len(h.rooms[room]) >= h.maxPerRoom {
-		return false
+		return false, "max clients per room reached"
 	}
 
 	if h.maxClients > 0 && h.totalClientsLocked() >= h.maxClients {
-		return false
+		return false, "max total clients reached"
 	}
 
-	return true
+	return true, ""
 }
 
 func (h *Hub) totalClientsLocked() int {

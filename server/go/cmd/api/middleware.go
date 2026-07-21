@@ -327,6 +327,7 @@ func (app *application) securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Referrer-Policy", "no-referrer")
 		w.Header().Set("Permissions-Policy", "camera=(self), microphone=(self), geolocation=()")
+		// Allow ws: in non-production to support local HTTP development.
 		csp := "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' ws: wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
 		if app.config.env == "production" {
 			csp = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self' wss:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
