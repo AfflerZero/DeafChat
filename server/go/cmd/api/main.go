@@ -133,6 +133,11 @@ func main() {
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
 
+	if cfg.proxy.trustHeaders && len(cfg.proxy.trustedNets) == 0 {
+		logger.Warn("proxy-trust-headers enabled without proxy-trusted-cidrs; disabling trusted proxy header parsing")
+		cfg.proxy.trustHeaders = false
+	}
+
 	db, err := openDB(cfg)
 	if err != nil {
 		logger.Error(err.Error())
