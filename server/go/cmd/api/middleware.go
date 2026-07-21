@@ -4,6 +4,7 @@ import (
 	"errors"
 	"expvar"
 	"fmt"
+	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -13,7 +14,6 @@ import (
 	"github.com/AfflerZero/DeafChat/internal/data"
 	"github.com/AfflerZero/DeafChat/internal/validator"
 
-	"github.com/tomasen/realip"
 	"golang.org/x/time/rate"
 )
 
@@ -63,7 +63,7 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 	}()
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		ip := realip.FromRequest(r)
+		ip := app.clientIP(r)
 
 		mu.Lock()
 
@@ -85,6 +85,70 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 
 		next.ServeHTTP(w, r)
 	})
+}
+
+func (app *application) clientIP(r *http.Request) string {
+	remoteIP := parseIPFromRemoteAddr(r.RemoteAddr)
+	if remoteIP == "" {
+		return ""
+	}
+
+	if app.config.proxy.trustHeaders && app.isTrustedProxy(remoteIP) {
+		forwardedIP := forwardedClientIP(r)
+		if forwardedIP != "" {
+			return forwardedIP
+		}
+	}
+
+	return remoteIP
+}
+
+func forwardedClientIP(r *http.Request) string {
+	xff := strings.TrimSpace(r.Header.Get("X-Forwarded-For"))
+	if xff != "" {
+		parts := strings.Split(xff, ",")
+		first := strings.TrimSpace(parts[0])
+		if net.ParseIP(first) != nil {
+			return first
+		}
+	}
+
+	xrip := strings.TrimSpace(r.Header.Get("X-Real-IP"))
+	if net.ParseIP(xrip) != nil {
+		return xrip
+	}
+
+	return ""
+}
+
+func parseIPFromRemoteAddr(remoteAddr string) string {
+	host, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		if net.ParseIP(remoteAddr) != nil {
+			return remoteAddr
+		}
+		return ""
+	}
+
+	if net.ParseIP(host) == nil {
+		return ""
+	}
+	return host
+}
+
+func (app *application) isTrustedProxy(ip string) bool {
+	parsedIP := net.ParseIP(ip)
+	if parsedIP == nil {
+		return false
+	}
+
+	for _, network := range app.config.proxy.trustedNets {
+		if network.Contains(parsedIP) {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (app *application) authenticate(next http.Handler) http.Handler {
@@ -261,6 +325,15 @@ func (app *application) securityHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("X-Content-Type-Options", "nosniff")
 		w.Header().Set("X-Frame-Options", "DENY")
+		w.Header().Set("Referrer-Policy", "no-referrer")
+		w.Header().Set("Permissions-Policy", "camera=(self), microphone=(self), geolocation=()")
+		// Allow ws: in non-production to support local HTTP development.
+		connectSrc := "connect-src 'self' ws: wss:"
+		if app.config.env == "production" {
+			connectSrc = "connect-src 'self' wss:"
+		}
+		csp := "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; " + connectSrc + "; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+		w.Header().Set("Content-Security-Policy", csp)
 
 		if app.config.env == "production" {
 			w.Header().Set("Strict-Transport-Security", "max-age=31536000; includeSubDomains")

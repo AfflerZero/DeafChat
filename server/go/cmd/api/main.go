@@ -7,6 +7,7 @@ import (
 	"flag"
 	"fmt"
 	"log/slog"
+	"net"
 	"os"
 	"runtime"
 	"strings"
@@ -39,6 +40,18 @@ type config struct {
 		enabled bool
 		rps     float64
 		burst   int
+	}
+	proxy struct {
+		trustHeaders bool
+		trustedCIDRs []string
+		trustedNets  []*net.IPNet
+	}
+	ws struct {
+		minRoomLength     int
+		maxRoomLength     int
+		maxRooms          int
+		maxClientsPerRoom int
+		maxTotalClients   int
 	}
 	smtp struct {
 		host     string
@@ -78,10 +91,30 @@ func main() {
 	flag.Float64Var(&cfg.limiter.rps, "limiter-rps", 2, "Rate limiter maximum requests per second")
 	flag.IntVar(&cfg.limiter.burst, "limiter-burst", 4, "Rate limiter maximum burst")
 
-	flag.StringVar(&cfg.smtp.host, "smtp-host", "sandbox.smtp.mailtrap.io", "SMTP host")
+	flag.BoolVar(&cfg.proxy.trustHeaders, "proxy-trust-headers", false, "Trust X-Forwarded-For/X-Real-IP headers from trusted proxies")
+	flag.Func("proxy-trusted-cidrs", "Trusted proxy CIDRs (space separated)", func(val string) error {
+		cfg.proxy.trustedCIDRs = strings.Fields(val)
+		cfg.proxy.trustedNets = make([]*net.IPNet, 0, len(cfg.proxy.trustedCIDRs))
+		for _, cidr := range cfg.proxy.trustedCIDRs {
+			_, network, err := net.ParseCIDR(cidr)
+			if err != nil {
+				return fmt.Errorf("invalid proxy-trusted-cidrs value %q: %w", cidr, err)
+			}
+			cfg.proxy.trustedNets = append(cfg.proxy.trustedNets, network)
+		}
+		return nil
+	})
+
+	flag.IntVar(&cfg.ws.minRoomLength, "ws-min-room-length", 3, "Minimum websocket room length")
+	flag.IntVar(&cfg.ws.maxRoomLength, "ws-max-room-length", 64, "Maximum websocket room length")
+	flag.IntVar(&cfg.ws.maxRooms, "ws-max-rooms", 1000, "Maximum number of active websocket rooms")
+	flag.IntVar(&cfg.ws.maxClientsPerRoom, "ws-max-clients-per-room", 2, "Maximum websocket clients per room")
+	flag.IntVar(&cfg.ws.maxTotalClients, "ws-max-total-clients", 2000, "Maximum total websocket clients")
+
+	flag.StringVar(&cfg.smtp.host, "smtp-host", "", "SMTP host")
 	flag.IntVar(&cfg.smtp.port, "smtp-port", 25, "SMTP port")
-	flag.StringVar(&cfg.smtp.username, "smtp-username", "a7420fc0883489", "SMTP username")
-	flag.StringVar(&cfg.smtp.password, "smtp-password", "e75ffd0a3aa5ec", "SMTP password")
+	flag.StringVar(&cfg.smtp.username, "smtp-username", "", "SMTP username")
+	flag.StringVar(&cfg.smtp.password, "smtp-password", "", "SMTP password")
 	flag.StringVar(&cfg.smtp.sender, "smtp-sender", "Greenlight <no-reply@github.com/AfflerZero/DeafChat>", "SMTP sender")
 
 	flag.Func("cors-trusted-origins", "Trusted CORS origins (space separated)", func(val string) error {
@@ -99,6 +132,11 @@ func main() {
 	}
 
 	logger := slog.New(slog.NewTextHandler(os.Stdout, nil))
+
+	if cfg.proxy.trustHeaders && len(cfg.proxy.trustedNets) == 0 {
+		logger.Warn("proxy-trust-headers enabled without proxy-trusted-cidrs; disabling trusted proxy header parsing")
+		cfg.proxy.trustHeaders = false
+	}
 
 	db, err := openDB(cfg)
 	if err != nil {
@@ -136,7 +174,7 @@ func main() {
 		mailer: mailer,
 	}
 
-	hub := signal.NewHub(logger)
+	hub := signal.NewHub(logger, cfg.ws.maxRooms, cfg.ws.maxClientsPerRoom, cfg.ws.maxTotalClients)
 	go hub.Run()
 
 	SetTrustedOrigins(cfg.cors.trustedOrigins)
