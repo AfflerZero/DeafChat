@@ -47,6 +47,7 @@ type config struct {
 		trustedNets  []*net.IPNet
 	}
 	ws struct {
+		minRoomLength     int
 		maxRoomLength     int
 		maxRooms          int
 		maxClientsPerRoom int
@@ -104,6 +105,7 @@ func main() {
 		return nil
 	})
 
+	flag.IntVar(&cfg.ws.minRoomLength, "ws-min-room-length", 3, "Minimum websocket room length")
 	flag.IntVar(&cfg.ws.maxRoomLength, "ws-max-room-length", 64, "Maximum websocket room length")
 	flag.IntVar(&cfg.ws.maxRooms, "ws-max-rooms", 1000, "Maximum number of active websocket rooms")
 	flag.IntVar(&cfg.ws.maxClientsPerRoom, "ws-max-clients-per-room", 2, "Maximum websocket clients per room")

@@ -45,6 +45,10 @@ func (app *application) signalHandler(hub *signal.Hub) http.HandlerFunc {
 			app.badRequestResponse(w, r, errors.New("room query parameter is required"))
 			return
 		}
+		if app.config.ws.minRoomLength > 0 && len(room) < app.config.ws.minRoomLength {
+			app.badRequestResponse(w, r, errors.New("room is too short"))
+			return
+		}
 		if app.config.ws.maxRoomLength > 0 && len(room) > app.config.ws.maxRoomLength {
 			app.badRequestResponse(w, r, errors.New("room exceeds maximum length"))
 			return
