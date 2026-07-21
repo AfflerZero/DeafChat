@@ -99,7 +99,7 @@ func main() {
 	flag.IntVar(&cfg.ws.maxClientsPerRoom, "ws-max-clients-per-room", 2, "Maximum websocket clients per room")
 	flag.IntVar(&cfg.ws.maxTotalClients, "ws-max-total-clients", 2000, "Maximum total websocket clients")
 
-	flag.StringVar(&cfg.smtp.host, "smtp-host", "sandbox.smtp.mailtrap.io", "SMTP host")
+	flag.StringVar(&cfg.smtp.host, "smtp-host", "", "SMTP host")
 	flag.IntVar(&cfg.smtp.port, "smtp-port", 25, "SMTP port")
 	flag.StringVar(&cfg.smtp.username, "smtp-username", "", "SMTP username")
 	flag.StringVar(&cfg.smtp.password, "smtp-password", "", "SMTP password")

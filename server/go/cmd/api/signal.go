@@ -45,8 +45,12 @@ func (app *application) signalHandler(hub *signal.Hub) http.HandlerFunc {
 			app.badRequestResponse(w, r, errors.New("room query parameter is required"))
 			return
 		}
-		if !roomNameRX.MatchString(room) || (app.config.ws.maxRoomLength > 0 && len(room) > app.config.ws.maxRoomLength) {
-			app.badRequestResponse(w, r, errors.New("invalid room format"))
+		if app.config.ws.maxRoomLength > 0 && len(room) > app.config.ws.maxRoomLength {
+			app.badRequestResponse(w, r, errors.New("room exceeds maximum length"))
+			return
+		}
+		if !roomNameRX.MatchString(room) {
+			app.badRequestResponse(w, r, errors.New("room contains invalid characters"))
 			return
 		}
 		if !hub.CanAccept(room) {
