@@ -1,6 +1,6 @@
 module github.com/AfflerZero/DeafChat
 
-go 1.25.4
+go 1.26.0
 
 require (
 	github.com/gorilla/websocket v1.5.3
@@ -8,7 +8,7 @@ require (
 	github.com/lib/pq v1.10.9
 	github.com/wneessen/go-mail v0.6.2
 	golang.org/x/crypto v0.41.0
-	golang.org/x/time v0.12.0
+	golang.org/x/time v0.16.0
 )
 
 require (
