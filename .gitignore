@@ -1,0 +1,32 @@
+# Secrets and local environment
+.envrc
+.env
+.env.*
+!.env.example
+
+# Go build output
+server/go/bin/
+server/go/api
+*.test
+*.out
+coverage.*
+
+# Node
+node_modules/
+dist/
+dist-ssr/
+*.local
+*.tsbuildinfo
+npm-debug.log*
+
+# Playwright
+test-results/
+playwright-report/
+
+# Editors and OS
+.DS_Store
+.idea/
+.vscode/*
+!.vscode/extensions.json
+*.swp
+*.log
